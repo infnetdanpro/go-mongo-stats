@@ -1,0 +1,18 @@
+FROM golang:1.18
+
+WORKDIR /www/
+
+COPY go.mod .
+COPY go.sum .
+
+RUN apt update && apt install gcc
+ENV CGO_ENABLED 1
+RUN go mod download
+
+COPY . .
+
+RUN go build -o web-go
+
+EXPOSE 8088
+
+CMD ["./web-go"]
