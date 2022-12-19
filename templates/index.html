@@ -6,7 +6,9 @@
         <h1>MaxPanel, stats service</h1>
         <p>How to use:</p>
         <ul>
-            <li>Register your application here: <a href="/api/v1/register/">/api/v1/register/</a> with POST: <pre>{"app_name": "test"}</pre></li>
+            <li>Register user here: <a href="/api/v1/user/register/">/api/v1/user/register/</a> with payload: <pre>{"email": "...", "password": "minimum 4 symbols"}</pre></li>
+            <li>Login user here: <a href="/api/v1/user/login/">/api/v1/user/login/</a> with payload: <pre>{"email": "...", "password": "..."}</pre></li>
+            <li>Register your application here: <a href="/api/v1/app/register/">/api/v1/register/</a> with POST: <pre>{"app_name": "test"}</pre></li>
             <li>Save data to route: <a href="/api/v1/stats/">/api/v1/stats/</a> via POST-request with application API key in header: <pre>API-MaxPanel: ...</pre></li>
             <li>You can send only primitive types: integer, strings etc</li>
             <li>

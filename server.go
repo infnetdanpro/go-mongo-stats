@@ -1,103 +1,82 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"text/template"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 	"github.com/infnetdanpro/go-mongo-stats/middleware"
-	"github.com/infnetdanpro/go-mongo-stats/model"
 	"github.com/infnetdanpro/go-mongo-stats/store"
+	"github.com/infnetdanpro/go-mongo-stats/views"
 )
 
 type Server struct {
-	AppRepository store.AppRepository
-	// EventRepository store.EventRepository
+	AppRepository          store.AppRepository
+	EventRepository        store.EventRepository
+	StorageEventRepository store.EventStorageRepository
+	UserRepository         store.UserRepository
+	CookieStore            *sessions.CookieStore
 }
 
 func (s Server) Start() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", middleware.SetHTMLHeader(s.HomeHandler))
 	r.HandleFunc("/api/health-check/", middleware.SetJSONHeader(s.HealthCheckHandler))
-	r.HandleFunc("/api/check/", middleware.SetJSONHeader(s.GetAppByKeyHandler))
-	r.HandleFunc("/api/register/", middleware.SetJSONHeader(s.RegisterAppHandler))
-	r.HandleFunc("/api/stats/", middleware.SetJSONHeader(s.SaveStats))
 
-	log.Fatal(http.ListenAndServe(":8088", r))
+	// Get application info, registration by user
+	r.HandleFunc("/api/app/check/", middleware.SetJSONHeader(s.GetAppByKeyHandler))
+	r.HandleFunc("/api/app/register/", middleware.SetJSONHeader(s.RegisterAppHandler))
+
+	// Work with stats: save, get
+	r.HandleFunc("/api/stats/save/", middleware.SetJSONHeader(s.SaveStats))
+	r.HandleFunc("/api/stats/", middleware.SetJSONHeader(s.GetStats))
+	r.HandleFunc("/api/stats/distinct-values/", middleware.SetJSONHeader(s.GetDistinctValuesByField))
+
+	// Work with users: CRUD
+	r.HandleFunc("/api/user/register/", middleware.SetJSONHeader(s.UserRegister))
+	r.HandleFunc("/api/user/login/", middleware.SetJSONHeader(s.UserLogin))
+	r.HandleFunc("/api/user/check/", middleware.SetJSONHeader(s.UserCheck))
+
+	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
 func (s Server) HomeHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles(os.Getenv("TEMPLATED_DIR") + "index.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	err = tmpl.Execute(w, "test")
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	views.Home(w)
 }
 
 func (s Server) HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	var h model.HealthCheck
-
-	h.Mongo = store.EchoMongo(os.Getenv("MONGODB_URI"))
-	h.Rabbit = store.EchoRabbitMQ(os.Getenv("RABBITMQ_URL"))
-
-	json.NewEncoder(w).Encode(h)
+	views.HealthCheck(w)
 }
 
 func (s Server) RegisterAppHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	var app model.AppRegister
-
-	err := decoder.Decode(&app)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if app.Name == "" {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-		return
-	}
-
-	createdApp, err := s.AppRepository.NewApp(app)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
-	}
-
-	json.NewEncoder(w).Encode(createdApp)
+	views.RegisterApp(w, r, s.AppRepository, s.UserRepository, s.CookieStore)
 }
 
 func (s Server) GetAppByKeyHandler(w http.ResponseWriter, r *http.Request) {
-	appKey := r.Header.Get("API-MaxPanel")
-
-	if appKey == "" {
-		http.Error(w, "API-MaxPanel is mandatory field", http.StatusUnprocessableEntity)
-		return
-	}
-
-	app, err := s.AppRepository.GetAppByKey(appKey)
-
-	if err != nil {
-		http.Error(w, "App not found", http.StatusNotFound)
-		return
-	}
-
-	json.NewEncoder(w).Encode(app)
+	views.GetAppByKey(w, r, s.AppRepository)
 }
 
 func (s Server) SaveStats(w http.ResponseWriter, r *http.Request) {
-	// get connection to the rabbit and put data into queue
+	views.SaveStats(w, r, s.AppRepository, s.EventRepository)
+}
+
+func (s Server) GetStats(w http.ResponseWriter, r *http.Request) {
+	views.GetStats(w, r, s.StorageEventRepository, s.CookieStore, s.UserRepository)
+}
+
+func (s Server) GetDistinctValuesByField(w http.ResponseWriter, r *http.Request) {
+	views.GetDistinctValuesByField(w, r, s.StorageEventRepository, s.CookieStore, s.UserRepository)
+}
+
+func (s Server) UserLogin(w http.ResponseWriter, r *http.Request) {
+	views.UserLogin(w, r, s.CookieStore, s.UserRepository)
+}
+
+func (s Server) UserCheck(w http.ResponseWriter, r *http.Request) {
+	views.UserCheck(w, r, s.CookieStore, s.UserRepository)
+}
+
+func (s Server) UserRegister(w http.ResponseWriter, r *http.Request) {
+	views.UserRegister(w, r, s.UserRepository)
 }
