@@ -4,6 +4,13 @@
  - RabbitMQ
 
 
+#### Start application
+```
+docker-compose build
+docker-compose up
+```
+And then open: http://localhost:8089/
+
 #### Tips
 To start local build app:
 
